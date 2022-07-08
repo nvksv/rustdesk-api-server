@@ -1,0 +1,15 @@
+[package]
+name = "rustdesk-api-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.5", features = ["json"] }
+to-socket-addrs = { version = "0.2", features = ["tokio"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.19", features = ["rt-multi-thread"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
