@@ -1,0 +1,63 @@
+{
+  "db": "SQLite",
+  "7277d286f0810d4f872f5131e2964c2fd5bf6a8168f93f0d7d430675daa52df3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "active",
+          "ordinal": 1,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            SELECT\n                user_id,\n                active\n            FROM\n                users\n            WHERE\n                username = ?\n        "
+  },
+  "c178e6f1506918a7a71d6f85ada5fa9499b85bdf4351e42cab268bc1341d998b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "ab",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            SELECT\n                ab\n            FROM\n                address_books\n            WHERE\n                user_id = ?\n        "
+  },
+  "e425adedf02966729328e21469f900f2263745f5f4d0880a850f2cc669c8061c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "password",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            SELECT\n                password\n            FROM\n                passwords\n            WHERE\n                user_id = ?\n        "
+  }
+}

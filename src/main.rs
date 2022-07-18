@@ -1,180 +1,222 @@
-use axum::{
-    routing::{get, post},
-    http::StatusCode,
-    response::IntoResponse,
-    Json, Router,
-};
-use serde::{Deserialize, Serialize};
-use serde_json;
-use std::net::SocketAddr;
+mod tokens;
+mod state;
+mod database;
+mod api;
+mod bearer;
 
-use tracing::info;
+use rocket::{
+    self, routes, post, Build, State, Rocket,
+    data::{Limits, ToByteUnit},
+    serde::{json::Json},
+    response::status,
+    config::LogLevel, 
+};
+
+use crate::{
+    bearer::AuthenticatedUser,
+    database::Database,
+    state::{UserPasswordInfo},
+};
+
+
 use tracing_subscriber;
 
-#[tokio::main]
-async fn main() {
-    // initialize tracing
+use crate::{
+    state::ApiState,
+    api::{LoginRequest, LoginReply, AbGetResponse, AbRequest, AuditRequest, CurrentUserRequest, CurrentUserResponse, UserInfo, LogoutReply},
+};
+
+macro_rules! unwrap_or_return {
+    ($optval:expr) => {
+        match $optval {
+            Ok(val) => val,
+            Err(err) => {
+                tracing::debug!("ERR in unwrap_or_return: {:?}", &err);
+                return err;
+            },
+        }
+    };
+}
+
+pub(crate) use unwrap_or_return;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddressBook {
+    ab: String,
+}
+
+impl AddressBook {
+    pub fn empty() -> Self {
+        Self { 
+            ab: "{}".to_string() 
+        }
+    }
+}
+
+async fn build_rocket() -> Rocket<Build> {
     tracing_subscriber::fmt::init();
 
-    // build our application with a route
-    let app = Router::new()
-//        .route("/", get(root))
-        .route("/api/login", post(login))
-        .route("/api/logout", post(logout))
-        .route("/api/ab/get", post(ab_get))
-        .route("/api/ab", post(ab))
-        .route("/api/audit", post(audit))
-        .route("/api/currentUser", post(current_user))
-        .fallback(post(fallback))
-        ;
-        
+    let figment = rocket::Config::figment()
+        .merge(("address", "0.0.0.0"))
+        .merge(("port", 21114))
+        .merge(("log_level", LogLevel::Debug))
+        .merge(("tls.certs", "rustdesk.crt"))
+        .merge(("tls.key", "rustdesk.pem"))
+        .merge(("limits", Limits::new().limit("json", 2.mebibytes())));
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let addr: SocketAddr = "0.0.0.0:21114".parse().unwrap();
-    tracing::debug!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let db = Database::open( ".api.db" ).await;
+    let state = ApiState::new( db );
+
+    rocket::custom(figment)
+        .mount("/api", routes![
+            login, 
+            ab_get, 
+            ab, 
+            current_user,
+            audit, 
+            logout
+        ])
+        .manage( state )
 }
 
-#[derive(Deserialize, Debug)]
-struct LoginRequest {
-    username: String,
-    password: String,
-    id: String,
-    uuid: String,
-}
-
-#[derive(Serialize, Debug)]
-struct LoginReply {
-    user: String,
-    access_token: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct CurrentUserRequest {
-    id: String,
-    uuid: String,
-}
-
-#[derive(Serialize, Debug)]
-struct CurrentUserResponse {
-    error: bool,
-    data: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct AbRequest {
-    data: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct AuditRequest {
-    #[serde(default)]
-    #[serde(rename = "Id")]
-    id_: String,
-    #[serde(default)]
-    action: String,
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    ip: String,
-    #[serde(default)]
-    uuid: String,
-}
-
-// {
-//    peers: [{id: "abcd", username: "", hostname: "", platform: "", alias: "", tags: ["", "", ...]}, ...],
-//    tags: [],
-// }
-
-#[derive(Serialize, Debug)]
-struct AbPeer {
-    id: String,
-}
-
-#[derive(Serialize, Debug)]
-struct Ab {
-    tags: Vec<String>,
-    peers: Vec<AbPeer>,
+#[rocket::launch]
+async fn launch_rocket() -> _{
+    build_rocket().await
 }
 
 
-#[derive(Serialize, Debug)]
-struct AbGetResponse {
-    error: bool,
-    updated_at: String,
-    data: String,
-}
-
-
+#[post("/login", format = "application/json", data = "<request>")]
 async fn login(
-    Json(request): Json<LoginRequest>,
-) -> impl IntoResponse {
+    state: &State<ApiState>,
+    request: Json<LoginRequest>,
+) -> Result<Json<LoginReply>, status::Forbidden<()>> {
+    let status_forbidden = || status::Forbidden::<()>(None);
+
+    let user_password_info = UserPasswordInfo::from_password( request.password.as_str() );
+    let (user, access_token) = state.user_login(&request.username, user_password_info).await.ok_or_else(status_forbidden)?;
+
     let reply = LoginReply {
-        user: "user".to_string(),
-        access_token: "uusseerr".to_string(),
+        user: UserInfo { 
+            name: user 
+        },
+        access_token,
     };
 
     tracing::debug!("login: {:?}", request);
-    (StatusCode::OK, Json(reply))
+
+    state.check_maintenance().await;
+
+    Ok(Json(reply))
 }
 
+#[post("/ab/get", format = "application/json")]
 async fn ab_get(
-) -> impl IntoResponse {
+    state: &State<ApiState>,
+    user: AuthenticatedUser,
+) -> Result<Json<AbGetResponse>, status::Forbidden<()>> {
     tracing::debug!("ab get");
+
+    let abi = state
+        .get_user_address_book(user.user_id)
+        .await
+        .unwrap_or_else(|| AddressBook::empty());
 
     let reply = AbGetResponse {
         error: false,
         updated_at: "now".to_string(),
-        data: serde_json::to_string(&Ab {
-            tags: vec!["tag1".to_string(), "tag2".to_string()],
-            peers: vec![AbPeer{id: "peer1".to_string()}, AbPeer{id: "513785419".to_string()}],
-        }).unwrap()
+        data: abi.ab
     };
+
+    state.check_maintenance().await;
 
     tracing::debug!("ab get reply: {:?}", Json(&reply));
-    (StatusCode::OK, Json(reply))
+    Ok(Json(reply))
 }
 
+#[post("/ab", format = "application/json", data = "<request>")]
 async fn ab(
-    Json(request): Json<AbRequest>,
-) -> impl IntoResponse {
+    state: &State<ApiState>,
+    user: AuthenticatedUser,
+    request: Json<AbRequest>,
+) -> Result<(), status::Forbidden<()>> {
     tracing::debug!("ab: {:?}", request);
-    StatusCode::OK
-}
 
-async fn current_user(
-    Json(request): Json<CurrentUserRequest>,
-) -> impl IntoResponse {
-    let reply = LoginReply {
-        user: "user".to_string(),
-        access_token: "uusseerr".to_string(),
+    let ab = request.data.clone();
+
+    tracing::debug!("new ab: {:?}", &ab);
+
+    let ab = AddressBook {
+        ab
     };
 
-    tracing::debug!("login: {:?}", request);
-    (StatusCode::OK, Json(reply))
+    let _ = unwrap_or_return!(
+        state
+        .set_user_address_book(user.user_id, ab)
+        .await
+        .ok_or(Err(status::Forbidden::<()>(None)))
+    );
+
+    state.check_maintenance().await;
+
+    Ok(())
 }
 
+#[post("/currentUser", format = "application/json", data = "<request>")]
+async fn current_user(
+    state: &State<ApiState>,
+    user: AuthenticatedUser,
+    request: Json<CurrentUserRequest>,
+) -> Result<Json<CurrentUserResponse>, status::Forbidden<()>> {
+    tracing::debug!("current_user authenticated request: {:?}", request);
+
+    let username = unwrap_or_return!(
+        state
+        .get_current_user_name(&user)
+        .await
+        .ok_or(Err(status::Forbidden::<()>(None)))
+    );
+
+    let reply = CurrentUserResponse {
+        error: false,
+        data: UserInfo { 
+            name: username 
+        }
+    };
+
+    tracing::debug!("current_user reply: {:?}", reply);
+    Ok(Json(reply))
+}
+
+#[post("/audit", format = "application/json", data = "<request>")]
 async fn audit(
-    Json(request): Json<AuditRequest>,
-) -> impl IntoResponse {
+    state: &State<ApiState>,
+    request: Json<AuditRequest>,
+) {
     tracing::debug!("audit: {:?}", request);
-    StatusCode::OK
+    state.check_maintenance().await;
 }
 
+#[post("/logout", format = "application/json", data = "<request>")]
 async fn logout(
-    Json(request): Json<CurrentUserRequest>,
-) -> impl IntoResponse {
+    state: &State<ApiState>,
+    user: AuthenticatedUser,
+    request: Json<CurrentUserRequest>,
+) -> Result<Json<LogoutReply>, status::Forbidden<()>> {
     tracing::debug!("logout: {:?}", request);
-    StatusCode::OK
+
+    let _ = unwrap_or_return!(
+        state
+        .user_logout(&user)
+        .await
+        .ok_or(Err(status::Forbidden::<()>(None)))
+    );
+
+    let reply = LogoutReply {
+        data: String::new()
+    };
+
+    state.check_maintenance().await;
+
+    Ok(Json(reply))
 }
 
-async fn fallback(
-    Json(request): Json<CurrentUserRequest>,
-) -> impl IntoResponse {
-    tracing::debug!("logout: {:?}", request);
-    StatusCode::OK
-}

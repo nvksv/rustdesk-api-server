@@ -1,1 +1,15 @@
 /target
+**/*.rs.bk
+Cargo.lock
+
+.idea/**
+.vscode/**
+
+/.*
+!/.gitignore
+!/.rustfmt.toml
+!/.versionrc
+!/.github/**
+
+
+
