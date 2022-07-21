@@ -39,65 +39,58 @@ impl Database {
     
         let pool = SqlitePool::connect_with(db_opts).await.unwrap();
     
+        Self::init_db(&pool).await;
+
         Self {
             pool
         }
     }
 
-    // #[allow(dead_code)]
-    // async fn init_db(&self) {
-    //     let mut conn = self.pool.acquire().await.unwrap();
+    async fn init_db(pool: &SqlitePool) {
+        let mut conn = pool.acquire().await.unwrap();
 
-    //     sqlx::query!(r#"
-    //         DROP INDEX IF EXISTS "index_address_books_id";
-    //         DROP TABLE IF EXISTS "address_books";
-    //         DROP INDEX IF EXISTS "index_passwords_id";
-    //         DROP TABLE IF EXISTS "passwords";
-    //         DROP INDEX IF EXISTS "index_users_username";
-    //         DROP INDEX IF EXISTS "index_users_id";
-    //         DROP TABLE IF EXISTS "users";
+        sqlx::query!(r#"
+            CREATE TABLE IF NOT EXISTS "users" (
+                "user_id"	INTEGER NOT NULL,
+                "active"	BOOLEAN NOT NULL,
+                "username"	TEXT NOT NULL,
+                PRIMARY KEY("user_id")
+            );
+            
+            CREATE UNIQUE INDEX IF NOT EXISTS "index_users_id" ON "users" (
+                "user_id"
+            );
+            
+            CREATE INDEX IF NOT EXISTS "index_users_username" ON "users" (
+                "username"
+            );
 
-    //         CREATE TABLE "users" (
-    //             "user_id"	INTEGER NOT NULL,
-    //             "active"	BOOLEAN NOT NULL,
-    //             "username"	TEXT NOT NULL,
-    //             PRIMARY KEY("user_id")
-    //         );
+            CREATE TABLE IF NOT EXISTS "passwords" (
+                "user_id"	INTEGER NOT NULL,
+                "password"	TEXT NOT NULL,
+                PRIMARY KEY("user_id"),
+                FOREIGN KEY("user_id") REFERENCES "users"("user_id")
+            );
             
-    //         CREATE UNIQUE INDEX "index_users_id" ON "users" (
-    //             "user_id"
-    //         );
-            
-    //         CREATE INDEX "index_users_username" ON "users" (
-    //             "username"
-    //         );
+            CREATE UNIQUE INDEX IF NOT EXISTS "index_passwords_id" ON "passwords" (
+                "user_id"
+            );
 
-    //         CREATE TABLE "passwords" (
-    //             "user_id"	INTEGER NOT NULL,
-    //             "password"	TEXT NOT NULL,
-    //             PRIMARY KEY("user_id"),
-    //             FOREIGN KEY("user_id") REFERENCES "users"("user_id")
-    //         );
+            CREATE TABLE IF NOT EXISTS "address_books" (
+                "user_id"	INTEGER NOT NULL,
+                "ab"	TEXT NOT NULL,
+                FOREIGN KEY("user_id") REFERENCES "users"("user_id"),
+                PRIMARY KEY("user_id")
+            );
             
-    //         CREATE UNIQUE INDEX "index_passwords_id" ON "passwords" (
-    //             "user_id"
-    //         );
-
-    //         CREATE TABLE "address_books" (
-    //             "user_id"	INTEGER NOT NULL,
-    //             "ab"	TEXT NOT NULL,
-    //             FOREIGN KEY("user_id") REFERENCES "users"("user_id"),
-    //             PRIMARY KEY("user_id")
-    //         );
-            
-    //         CREATE UNIQUE INDEX "index_address_books_id" ON "address_books" (
-    //             "user_id"
-    //         );
-    //     "#)
-    //     .execute(&mut conn)
-    //     .await
-    //     .unwrap();
-    // }
+            CREATE UNIQUE INDEX IF NOT EXISTS "index_address_books_id" ON "address_books" (
+                "user_id"
+            );
+        "#)
+        .execute(&mut conn)
+        .await
+        .unwrap();
+    }
 
     pub async fn find_user_by_name(&self, username: &str) -> (DatabaseConnection, Option<(UserId, DatabaseUserInfo)>) {
         let mut conn = DatabaseConnection { conn: self.pool.acquire().await.unwrap() };

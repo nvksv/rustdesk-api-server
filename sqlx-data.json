@@ -24,6 +24,16 @@
     },
     "query": "\n            SELECT\n                user_id,\n                active\n            FROM\n                users\n            WHERE\n                username = ?\n        "
   },
+  "873de1939be044bb61a487386a4560a6ceaaac15f0263b20548a280fbcd65ea2": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n            CREATE TABLE IF NOT EXISTS \"users\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"active\"\tBOOLEAN NOT NULL,\n                \"username\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_users_id\" ON \"users\" (\n                \"user_id\"\n            );\n            \n            CREATE INDEX IF NOT EXISTS \"index_users_username\" ON \"users\" (\n                \"username\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"passwords\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"password\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\"),\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_passwords_id\" ON \"passwords\" (\n                \"user_id\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"address_books\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"ab\"\tTEXT NOT NULL,\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\"),\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_address_books_id\" ON \"address_books\" (\n                \"user_id\"\n            );\n        "
+  },
   "c178e6f1506918a7a71d6f85ada5fa9499b85bdf4351e42cab268bc1341d998b": {
     "describe": {
       "columns": [
