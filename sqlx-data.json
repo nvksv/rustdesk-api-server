@@ -1,30 +1,6 @@
 {
   "db": "SQLite",
-  "7277d286f0810d4f872f5131e2964c2fd5bf6a8168f93f0d7d430675daa52df3": {
-    "describe": {
-      "columns": [
-        {
-          "name": "user_id",
-          "ordinal": 0,
-          "type_info": "Int64"
-        },
-        {
-          "name": "active",
-          "ordinal": 1,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "\n            SELECT\n                user_id,\n                active\n            FROM\n                users\n            WHERE\n                username = ?\n        "
-  },
-  "873de1939be044bb61a487386a4560a6ceaaac15f0263b20548a280fbcd65ea2": {
+  "5cf3ec1e5d65a87d045d66710dc371a4a64f970f4345b1c8f372576d651d6617": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -32,7 +8,7 @@
         "Right": 0
       }
     },
-    "query": "\n            CREATE TABLE IF NOT EXISTS \"users\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"active\"\tBOOLEAN NOT NULL,\n                \"username\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_users_id\" ON \"users\" (\n                \"user_id\"\n            );\n            \n            CREATE INDEX IF NOT EXISTS \"index_users_username\" ON \"users\" (\n                \"username\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"passwords\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"password\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\"),\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_passwords_id\" ON \"passwords\" (\n                \"user_id\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"address_books\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"ab\"\tTEXT NOT NULL,\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\"),\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_address_books_id\" ON \"address_books\" (\n                \"user_id\"\n            );\n        "
+    "query": "\n            CREATE TABLE IF NOT EXISTS \"users\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"active\"\tBOOLEAN NOT NULL,\n                \"admin\"\t    BOOLEAN NOT NULL,\n                \"username\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_users_id\" ON \"users\" (\n                \"user_id\"\n            );\n            \n            CREATE INDEX IF NOT EXISTS \"index_users_username\" ON \"users\" (\n                \"username\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"passwords\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"password\"\tTEXT NOT NULL,\n                PRIMARY KEY(\"user_id\"),\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_passwords_id\" ON \"passwords\" (\n                \"user_id\"\n            );\n\n            CREATE TABLE IF NOT EXISTS \"address_books\" (\n                \"user_id\"\tINTEGER NOT NULL,\n                \"ab\"\tTEXT NOT NULL,\n                FOREIGN KEY(\"user_id\") REFERENCES \"users\"(\"user_id\"),\n                PRIMARY KEY(\"user_id\")\n            );\n            \n            CREATE UNIQUE INDEX IF NOT EXISTS \"index_address_books_id\" ON \"address_books\" (\n                \"user_id\"\n            );\n        "
   },
   "c178e6f1506918a7a71d6f85ada5fa9499b85bdf4351e42cab268bc1341d998b": {
     "describe": {
@@ -51,6 +27,84 @@
       }
     },
     "query": "\n            SELECT\n                ab\n            FROM\n                address_books\n            WHERE\n                user_id = ?\n        "
+  },
+  "c9af214eec93d2ab9eac013109212792908109093d6e5071f75abe86093218cc": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "active",
+          "ordinal": 1,
+          "type_info": "Bool"
+        },
+        {
+          "name": "admin",
+          "ordinal": 2,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            SELECT\n                user_id,\n                active,\n                admin\n            FROM\n                users\n            WHERE\n                username = ?\n        "
+  },
+  "cf313329bf04614ff2187580bc8c717b794ce7d32da7281e9ee29c1879abe60c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "active",
+          "ordinal": 1,
+          "type_info": "Bool"
+        },
+        {
+          "name": "admin",
+          "ordinal": 2,
+          "type_info": "Bool"
+        },
+        {
+          "name": "username",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "address_book",
+          "ordinal": 5,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n            SELECT\n                users.user_id as id,\n                users.active,\n                users.admin,\n                users.username, \n                passwords.password,\n                address_books.ab as address_book\n            FROM\n                users\n                INNER JOIN passwords\n                    ON passwords.user_id = users.user_id\n                INNER JOIN address_books\n                    ON address_books.user_id = users.user_id\n            "
   },
   "e425adedf02966729328e21469f900f2263745f5f4d0880a850f2cc669c8061c": {
     "describe": {

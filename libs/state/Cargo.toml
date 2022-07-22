@@ -1,0 +1,15 @@
+[package]
+name = "state"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utils = { path = "../utils" }
+
+rocket = { version = "0.5.0-rc.2", features = ["json", "tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread", "sync"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
+sqlx = { version = "0.6.0", features = ["offline", "sqlite", "runtime-tokio-rustls"] }

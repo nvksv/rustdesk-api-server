@@ -3,16 +3,17 @@ use std::{
     collections::HashMap,
     time::SystemTime,
     sync::atomic::{AtomicU64, Ordering},
+    path::Path,
 };
 use tokio::sync::RwLock;
+use utils::{AddressBook, Token};
 use crate::{
-    AddressBook,
-    tokens::Token,
-    database::{Database, DatabaseUserPasswordInfo}, bearer::AuthenticatedUser,
+    UserId, SessionId,
+    database::Database, 
+    bearer::AuthenticatedUser,
+    password::UserPasswordInfo,
 };
-
-pub type SessionId = u64;
-pub type UserId = i64;
+use crate::ui;
 
 pub struct ApiState {
     last_maintenance_time: AtomicU64,
@@ -35,26 +36,11 @@ struct SessionsState {
     sessions: HashMap<SessionId, SessionInfo>,
 }
 
-pub struct UserPasswordInfo<'s> {
-    password: &'s str,
-}
-
-impl<'s> UserPasswordInfo<'s> {
-    pub fn from_password( password: &'s str ) -> Self {
-        Self { 
-            password
-        }
-    }
-
-    fn check( &self, db_password_info: DatabaseUserPasswordInfo ) -> bool {
-        db_password_info.password.eq( self.password )
-    }
-}
-
 #[derive(Debug, Default)]
-struct UserInfo {
+pub struct UserInfo {
     sessions_count: usize,
-    username: String,
+    pub username: String,
+    pub admin: bool,
 }
 
 #[derive(Debug, Default)]
@@ -77,7 +63,8 @@ fn secs_from_epoch() -> u64 {
 }
 
 impl ApiState {
-    pub fn new( db: Database ) -> Self {
+    pub async fn new_with_db<P: AsRef<Path>>( db_filename: P ) -> Self {
+        let db = Database::open( db_filename ).await;
         Self { 
             last_maintenance_time: AtomicU64::new(0),
             access_tokens: Default::default(), 
@@ -161,6 +148,7 @@ impl ApiState {
             let user_info = UserInfo {
                 sessions_count: 1,
                 username: username.clone(),
+                admin: db_user_info.admin,
             };
             state_users.insert( user_id, user_info );
 
@@ -268,6 +256,19 @@ impl ApiState {
     pub async fn get_current_user_name(&self, user: &AuthenticatedUser) -> Option<String> {
         let state_users = self.users.read().await;
         state_users.get(&user.user_id).map(|ui| ui.username.clone())
+    }
+
+    pub async fn with_user_info<R>(&self, user_id: &UserId, mut f: impl FnMut(&UserInfo) -> R) -> Option<R> {
+        let state_users = self.users.read().await;
+        if let Some(user_info) = state_users.get(user_id) {
+            Some(f(user_info))
+        } else {
+            None
+        }
+    }
+
+    pub async fn ui_get_all_users(&self) -> Option<Vec<ui::UserInfo>> {
+        self.db.ui_get_all_users().await
     }
 
 }

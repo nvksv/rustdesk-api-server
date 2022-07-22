@@ -1,0 +1,19 @@
+[package]
+name = "ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utils = { path = "../utils" }
+state = { path = "../state" }
+
+rocket = { version = "0.5.0-rc.2", features = ["json", "tls"] }
+sqlx = { version = "0.6.0", features = ["offline", "sqlite", "runtime-tokio-rustls"] }
+rand = "0.8"
+base64 = "0.13"
+
+thiserror = "1.0"
+askama = { git = "https://github.com/djc/askama.git", version = "0.11.2", features = ["with-rocket"] }
+askama_rocket = { git = "https://github.com/djc/askama.git", package = "askama_rocket", version = "0.11" }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "0.8", features = ["serde", "v4"] }

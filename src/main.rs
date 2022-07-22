@@ -1,8 +1,9 @@
-mod tokens;
-mod state;
-mod database;
 mod api;
-mod bearer;
+
+use utils;
+use state;
+#[cfg(feature = "ui")]
+use ui;
 
 use rocket::{
     self, routes, post, Build, State, Rocket,
@@ -11,47 +12,14 @@ use rocket::{
     response::status,
     config::LogLevel, 
 };
-
-use crate::{
-    bearer::AuthenticatedUser,
-    database::Database,
-    state::{UserPasswordInfo},
-};
-
+use utils::{AddressBook, unwrap_or_return};
+use state::{ApiState, AuthenticatedUser, UserPasswordInfo};
 
 use tracing_subscriber;
 
 use crate::{
-    state::ApiState,
     api::{LoginRequest, LoginReply, AbGetResponse, AbRequest, AuditRequest, CurrentUserRequest, CurrentUserResponse, UserInfo, LogoutReply},
 };
-
-macro_rules! unwrap_or_return {
-    ($optval:expr) => {
-        match $optval {
-            Ok(val) => val,
-            Err(err) => {
-                tracing::debug!("ERR in unwrap_or_return: {:?}", &err);
-                return err;
-            },
-        }
-    };
-}
-
-pub(crate) use unwrap_or_return;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AddressBook {
-    ab: String,
-}
-
-impl AddressBook {
-    pub fn empty() -> Self {
-        Self { 
-            ab: "{}".to_string() 
-        }
-    }
-}
 
 async fn build_rocket() -> Rocket<Build> {
     tracing_subscriber::fmt::init();
@@ -60,14 +28,13 @@ async fn build_rocket() -> Rocket<Build> {
         .merge(("address", "0.0.0.0"))
         .merge(("port", 21114))
         .merge(("log_level", LogLevel::Debug))
-        .merge(("tls.certs", "rustdesk.crt"))
-        .merge(("tls.key", "rustdesk.pem"))
+        // .merge(("tls.certs", "rustdesk.crt"))
+        // .merge(("tls.key", "rustdesk.pem"))
         .merge(("limits", Limits::new().limit("json", 2.mebibytes())));
 
-    let db = Database::open( ".api.db" ).await;
-    let state = ApiState::new( db );
+    let state = ApiState::new_with_db( ".api.db" ).await;
 
-    rocket::custom(figment)
+    let mut rocket = rocket::custom(figment)
         .mount("/api", routes![
             login, 
             ab_get, 
@@ -76,7 +43,14 @@ async fn build_rocket() -> Rocket<Build> {
             audit, 
             logout
         ])
-        .manage( state )
+        .manage( state );
+
+    #[cfg(feature = "ui")]
+    {
+        rocket = ui::update_rocket(rocket);
+    }
+
+    rocket
 }
 
 #[rocket::launch]

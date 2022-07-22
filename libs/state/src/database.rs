@@ -1,9 +1,10 @@
 use std::path::Path;
 use sqlx::{QueryBuilder, sqlite::{Sqlite, SqlitePool, SqliteConnectOptions, SqliteJournalMode}, pool::PoolConnection};
 use crate::{
-    AddressBook,
-    state::{UserId}
+    UserId,
 };
+use utils::AddressBook;
+use crate::ui;
 
 pub struct Database {
     pool: SqlitePool,
@@ -15,6 +16,7 @@ pub struct DatabaseConnection {
 
 pub struct DatabaseUserInfo {
     pub active: bool,
+    pub admin: bool,
 }
 
 pub struct DatabaseUserPasswordInfo {
@@ -47,12 +49,13 @@ impl Database {
     }
 
     async fn init_db(pool: &SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
+        let mut tx = pool.begin().await.unwrap();
 
         sqlx::query!(r#"
             CREATE TABLE IF NOT EXISTS "users" (
                 "user_id"	INTEGER NOT NULL,
                 "active"	BOOLEAN NOT NULL,
+                "admin"	    BOOLEAN NOT NULL,
                 "username"	TEXT NOT NULL,
                 PRIMARY KEY("user_id")
             );
@@ -87,9 +90,11 @@ impl Database {
                 "user_id"
             );
         "#)
-        .execute(&mut conn)
+        .execute(&mut tx)
         .await
         .unwrap();
+
+        tx.commit().await.unwrap();
     }
 
     pub async fn find_user_by_name(&self, username: &str) -> (DatabaseConnection, Option<(UserId, DatabaseUserInfo)>) {
@@ -98,7 +103,8 @@ impl Database {
         let res = unwrap_or_return_tuple!(conn, sqlx::query!(r#"
             SELECT
                 user_id,
-                active
+                active,
+                admin
             FROM
                 users
             WHERE
@@ -111,6 +117,7 @@ impl Database {
         let user_id: UserId = res.user_id;
         let dbi = DatabaseUserInfo {
             active: res.active,
+            admin: res.admin,
         };
 
         (conn, Some((user_id, dbi)))
@@ -193,4 +200,31 @@ impl Database {
 
         Some(())
     }
+
+    pub async fn ui_get_all_users(&self) -> Option<Vec<ui::UserInfo>> {
+        let mut conn = self.pool.acquire().await.unwrap();
+
+        let res = sqlx::query_as!(ui::UserInfo, r#"
+            SELECT
+                users.user_id as id,
+                users.active,
+                users.admin,
+                users.username, 
+                passwords.password,
+                address_books.ab as address_book
+            FROM
+                users
+                INNER JOIN passwords
+                    ON passwords.user_id = users.user_id
+                INNER JOIN address_books
+                    ON address_books.user_id = users.user_id
+            "#)
+        .fetch_all(&mut conn)
+        .await
+        .ok()?;
+
+        Some(res)
+    }
+
+
 }

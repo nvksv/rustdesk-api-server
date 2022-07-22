@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<section id="message_board">
+  <h1>Hi, {{ current_user }}!</h1>
+
+  <h2>Users</h2>
+  <table>
+    <tr class="table-header">
+      <td>id</td>
+      <td>active</td>
+      <td>admin</td>
+      <td>username</td>
+      <td>password</td>
+      <td>address book</td>
+    </tr>
+    {% for row in users %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.active }}</td>
+      <td>{{ row.admin }}</td>
+      <td>{{ row.username }}</td>
+      <td>{{ row.password }}</td>
+      <td>{{ row.address_book }}</td>
+    </tr>
+    {% endfor %}
+  </table>  
+</section>
+{% endblock %}

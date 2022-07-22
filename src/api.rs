@@ -1,10 +1,7 @@
 use rocket::{
     serde::{Serialize, Deserialize},
 };
-
-use crate::{
-    tokens::Token,
-};
+use utils::Token;
 
 #[derive(Deserialize, Debug)]
 pub struct LoginRequest {
