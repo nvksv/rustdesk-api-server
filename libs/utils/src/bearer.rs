@@ -9,13 +9,23 @@ use crate::{
     tokens::Token,
 };
 
+pub trait IntoToken {
+    fn into_token(self) -> Token;
+}
+
 #[derive(Debug)]
-pub struct BearerToken {
+pub struct BearerAuthToken {
     pub token: Token,
 }
 
+impl IntoToken for BearerAuthToken {
+    fn into_token(self) -> Token {
+        self.token
+    }
+}
+
 #[rocket::async_trait]
-impl<'r> FromRequest<'r> for BearerToken {
+impl<'r> FromRequest<'r> for BearerAuthToken {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
@@ -49,3 +59,32 @@ impl<'r> FromRequest<'r> for BearerToken {
     }
 }
 
+#[derive(Debug)]
+pub struct CookieAuthToken {
+    pub token: Token,
+}
+
+impl IntoToken for CookieAuthToken {
+    fn into_token(self) -> Token {
+        self.token
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for CookieAuthToken {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let token = unwrap_or_return!(
+            request.cookies()
+            .get(AUTHORIZATION.as_str())
+            .map(|cookie| cookie.value().trim())
+            .and_then(|token_str| Token::from_str(token_str).ok())
+            .ok_or(Outcome::Forward(()))
+        );
+
+        let cookie_auth = Self { token };
+
+        Outcome::Success(cookie_auth)
+    }
+}

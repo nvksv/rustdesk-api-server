@@ -214,9 +214,9 @@ impl Database {
                 address_books.ab as address_book
             FROM
                 users
-                INNER JOIN passwords
+                LEFT JOIN passwords
                     ON passwords.user_id = users.user_id
-                INNER JOIN address_books
+                LEFT JOIN address_books
                     ON address_books.user_id = users.user_id
             "#)
         .fetch_all(&mut conn)

@@ -10,7 +10,7 @@ use utils::{AddressBook, Token};
 use crate::{
     UserId, SessionId,
     database::Database, 
-    bearer::AuthenticatedUser,
+    bearer::{AuthenticatedUserInfo},
     password::UserPasswordInfo,
 };
 use crate::ui;
@@ -112,7 +112,7 @@ impl ApiState {
         }
     }
 
-    pub async fn user_login<'s>(&self, username: &String, password_info: UserPasswordInfo<'s>) -> Option<(String, Token)> {
+    pub async fn user_login<'s>(&self, username: &String, password_info: UserPasswordInfo<'s>, admin_only: bool) -> Option<(String, Token)> {
         let (conn, user_id, db_user_info) = match self.db.find_user_by_name(username.as_str()).await {
             (conn, Some((user_id, db_user_info))) => (conn, user_id, db_user_info),
             _ => return None,
@@ -120,6 +120,12 @@ impl ApiState {
 
         if !db_user_info.active {
             return None;
+        }
+
+        if admin_only {
+            if !db_user_info.admin {
+                return None;
+            }
         }
 
         let (conn, db_password_info) = match self.db.get_user_password(conn, user_id).await {
@@ -230,7 +236,7 @@ impl ApiState {
         Some(())
     }
 
-    pub async fn user_logout(&self, user: &AuthenticatedUser) -> Option<()> {
+    pub async fn user_logout(&self, user: &AuthenticatedUserInfo) -> Option<()> {
         let mut state_access_tokens = self.access_tokens.write().await;
         let mut state_sessions = self.sessions.write().await;
         let mut state_users = self.users.write().await;
@@ -253,7 +259,7 @@ impl ApiState {
         Some(())
     }
 
-    pub async fn get_current_user_name(&self, user: &AuthenticatedUser) -> Option<String> {
+    pub async fn get_current_user_name(&self, user: &AuthenticatedUserInfo) -> Option<String> {
         let state_users = self.users.read().await;
         state_users.get(&user.user_id).map(|ui| ui.username.clone())
     }

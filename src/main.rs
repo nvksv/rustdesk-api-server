@@ -1,6 +1,6 @@
 mod api;
 
-use utils;
+use utils::{self, BearerAuthToken};
 use state;
 #[cfg(feature = "ui")]
 use ui;
@@ -13,13 +13,15 @@ use rocket::{
     config::LogLevel, 
 };
 use utils::{AddressBook, unwrap_or_return};
-use state::{ApiState, AuthenticatedUser, UserPasswordInfo};
+use state::{ApiState, UserPasswordInfo};
 
 use tracing_subscriber;
 
 use crate::{
     api::{LoginRequest, LoginReply, AbGetResponse, AbRequest, AuditRequest, CurrentUserRequest, CurrentUserResponse, UserInfo, LogoutReply},
 };
+
+type AuthenticatedUser = state::AuthenticatedUser<BearerAuthToken>;
 
 async fn build_rocket() -> Rocket<Build> {
     tracing_subscriber::fmt::init();
@@ -67,7 +69,7 @@ async fn login(
     let status_forbidden = || status::Forbidden::<()>(None);
 
     let user_password_info = UserPasswordInfo::from_password( request.password.as_str() );
-    let (user, access_token) = state.user_login(&request.username, user_password_info).await.ok_or_else(status_forbidden)?;
+    let (user, access_token) = state.user_login(&request.username, user_password_info, false).await.ok_or_else(status_forbidden)?;
 
     let reply = LoginReply {
         user: UserInfo { 
@@ -91,7 +93,7 @@ async fn ab_get(
     tracing::debug!("ab get");
 
     let abi = state
-        .get_user_address_book(user.user_id)
+        .get_user_address_book(user.info.user_id)
         .await
         .unwrap_or_else(|| AddressBook::empty());
 
@@ -125,7 +127,7 @@ async fn ab(
 
     let _ = unwrap_or_return!(
         state
-        .set_user_address_book(user.user_id, ab)
+        .set_user_address_book(user.info.user_id, ab)
         .await
         .ok_or(Err(status::Forbidden::<()>(None)))
     );
@@ -145,7 +147,7 @@ async fn current_user(
 
     let username = unwrap_or_return!(
         state
-        .get_current_user_name(&user)
+        .get_current_user_name(&user.info)
         .await
         .ok_or(Err(status::Forbidden::<()>(None)))
     );
@@ -180,7 +182,7 @@ async fn logout(
 
     let _ = unwrap_or_return!(
         state
-        .user_logout(&user)
+        .user_logout(&user.info)
         .await
         .ok_or(Err(status::Forbidden::<()>(None)))
     );

@@ -4,7 +4,7 @@ mod address_book;
 mod types;
 
 pub use tokens::Token;
-pub use bearer::BearerToken;
+pub use bearer::{BearerAuthToken, CookieAuthToken, IntoToken};
 pub use address_book::AddressBook;
 pub use types::*;
 
